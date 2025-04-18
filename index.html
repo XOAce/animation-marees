@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Animation Marées</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #001d3d;
+      font-family: sans-serif;
+    }
+    canvas {
+      display: block;
+    }
+    .button-group {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      display: flex;
+      gap: 10px;
+      flex-direction: column;
+    }
+    button, input[type=range] {
+      padding: 10px 15px;
+      font-size: 14px;
+      background: #f5f3ce;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+     }
+    #tideIndicator {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      padding: 10px 15px;
+      background: rgba(255, 255, 255, 0.8);
+      border-radius: 8px;
+      font-size: 16px;
+      color: #000;
+    }
+    #legend {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      width: 350px;
+      background: rgba(255, 255, 255, 0.9);
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 14px;
+      color: #000;
+    }
+    #dayCounter {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      background: rgba(255,255,255,0.9);
+      padding: 10px 15px;
+      border-radius: 8px;
+      font-size: 16px;
+      color: #000;
+    }
+  </style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<div class="button-group">
+  <button id="toggleButton">Activer la rotation auto</button>
+  <button id="lunarCycleButton">Démarrer cycle lunaire (28 jours)</button>
+  <label>Vitesse du cycle : <input id="speedSlider" type="range" min="0.001" max="0.02" step="0.0005" value="0.0025"></label>
+</div>
+<div id="tideIndicator">Amplitude marée : 0%</div>
+<div id="dayCounter">Jour lunaire : 0</div>
+<div id="legend">
+  <strong>Légende :</strong><br>
+  - La <strong>Lune</strong> attire l’eau et crée deux marées opposées.<br>
+  - Le <strong>Soleil</strong> a aussi un effet plus faible.<br>
+  - L’effet combiné modifie la forme des marées.<br>
+  - Vives-eaux : Lune et Soleil alignés (effet renforcé).<br>
+  - Mortes-eaux : Lune et Soleil perpendiculaires (effet réduit).<br>
+  - Faites glisser la Lune ou le Soleil pour explorer.<br>
+  - Le cycle lunaire dure environ 28 jours (animation accélérée ici).<br>
+  - Utilisez le curseur pour ajuster la vitesse du cycle.
+</div>
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+const centerX = canvas.width / 2;
+const centerY = canvas.height / 2;
+const earthRadius = 60;
+const moonRadius = 20;
+const sunRadius = 30;
+const orbitRadius = 200;
+let sunDistance = 350; // Réduit pour rester visible
+
+let moonAngle = 0;
+let sunAngle = Math.PI / 3;
+let isDraggingMoon = false;
+let isDraggingSun = false;
+let autoRotate = false;
+let lunarCycle = false;
+let lunarSpeed = 0.0025;
+let lunarDay = 0;
+
+const toggleButton = document.getElementById("toggleButton");
+const lunarCycleButton = document.getElementById("lunarCycleButton");
+const tideIndicator = document.getElementById("tideIndicator");
+const speedSlider = document.getElementById("speedSlider");
+const dayCounter = document.getElementById("dayCounter");
+
+speedSlider.addEventListener("input", () => {
+  lunarSpeed = parseFloat(speedSlider.value);
+});
+
+toggleButton.addEventListener("click", () => {
+  autoRotate = !autoRotate;
+  toggleButton.textContent = autoRotate ? "Désactiver la rotation auto" : "Activer la rotation auto";
+});
+
+lunarCycleButton.addEventListener("click", () => {
+  lunarCycle = !lunarCycle;
+  lunarCycleButton.textContent = lunarCycle ? "Arrêter cycle lunaire" : "Démarrer cycle lunaire (28 jours)";
+});
+
+function drawEarth() {
+  ctx.fillStyle = "#4ea8de";
+  ctx.beginPath();
+  ctx.arc(centerX, centerY, earthRadius, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawTide() {
+  const moonDx = Math.cos(moonAngle);
+  const moonDy = Math.sin(moonAngle);
+  const sunDx = Math.cos(sunAngle);
+  const sunDy = Math.sin(sunAngle);
+
+  const totalDx = moonDx * 1.0 + sunDx * 0.46;
+  const totalDy = moonDy * 1.0 + sunDy * 0.46;
+  const angle = Math.atan2(totalDy, totalDx);
+
+  const amplitude = Math.sqrt(totalDx * totalDx + totalDy * totalDy);
+  const maxAmplitude = 1.46;
+  const percent = Math.round((amplitude / maxAmplitude) * 100);
+
+  let tideType = "normale";
+  const angleDiff = Math.abs(moonAngle - sunAngle) % (2 * Math.PI);
+  if (angleDiff < 0.2 || Math.abs(angleDiff - Math.PI * 2) < 0.2 || Math.abs(angleDiff - Math.PI) < 0.2) {
+    tideType = "Vives-eaux (fortes)";
+  } else if (Math.abs(angleDiff - Math.PI / 2) < 0.2 || Math.abs(angleDiff - 3 * Math.PI / 2) < 0.2) {
+    tideType = "Mortes-eaux (faibles)";
+  }
+
+  tideIndicator.textContent = `Amplitude marée : ${percent}% - ${tideType}`;
+
+  ctx.save();
+  ctx.translate(centerX, centerY);
+  ctx.rotate(angle);
+  ctx.fillStyle = "rgba(173, 216, 230, 0.55)";
+  ctx.beginPath();
+  ctx.ellipse(0, 0, earthRadius + amplitude * 45, earthRadius + amplitude * 20, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  drawForceArrow(centerX, centerY, moonDx, moonDy, "#f5f3ce");
+  drawForceArrow(centerX, centerY, sunDx * 0.46, sunDy * 0.46, "#fcbf49");
+}
+
+function drawForceArrow(x, y, dx, dy, color) {
+  const length = 80;
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(x + dx * length, y + dy * length);
+  ctx.stroke();
+  const angle = Math.atan2(dy, dx);
+  ctx.beginPath();
+  ctx.moveTo(x + dx * length, y + dy * length);
+  ctx.lineTo(x + dx * length - 10 * Math.cos(angle - 0.3), y + dy * length - 10 * Math.sin(angle - 0.3));
+  ctx.lineTo(x + dx * length - 10 * Math.cos(angle + 0.3), y + dy * length - 10 * Math.sin(angle + 0.3));
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawMoon() {
+  const moonX = centerX + Math.cos(moonAngle) * orbitRadius;
+  const moonY = centerY + Math.sin(moonAngle) * orbitRadius;
+
+  // Phase lunaire (simplifiée)
+  const phase = Math.cos(moonAngle - sunAngle);
+  const illuminated = (phase + 1) / 2;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(moonX, moonY, moonRadius, 0, Math.PI * 2);
+  ctx.fillStyle = "#999";
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.arc(moonX, moonY, moonRadius, 0, Math.PI * 2);
+  ctx.fillStyle = "black";
+  ctx.globalAlpha = 1 - illuminated;
+  ctx.fill();
+  ctx.globalAlpha = 1;
+
+  ctx.fillStyle = "white";
+  ctx.font = "14px sans-serif";
+  ctx.fillText("Lune", moonX + 25, moonY);
+
+  // Ligne entre Terre et Lune
+  ctx.beginPath();
+  ctx.moveTo(centerX, centerY);
+  ctx.lineTo(moonX, moonY);
+  ctx.strokeStyle = "#888";
+  ctx.setLineDash([5, 3]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
+}
+
+function drawSun() {
+  const sunX = centerX + Math.cos(sunAngle) * sunDistance;
+  const sunY = centerY + Math.sin(sunAngle) * sunDistance;
+  ctx.fillStyle = "#fcbf49";
+  ctx.beginPath();
+  ctx.arc(sunX, sunY, sunRadius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "white";
+  ctx.font = "18px sans-serif";
+  ctx.fillText("Soleil", sunX + 40, sunY);
+
+  // Ligne entre Terre et Soleil
+  ctx.beginPath();
+  ctx.moveTo(centerX, centerY);
+  ctx.lineTo(sunX, sunY);
+  ctx.strokeStyle = "#fcbf49";
+  ctx.setLineDash([4, 3]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+function getMouseAngle(x, y) {
+  return Math.atan2(y - centerY, x - centerX);
+}
+
+canvas.addEventListener("mousedown", (e) => {
+  const mouseX = e.clientX;
+  const mouseY = e.clientY;
+  const moonX = centerX + Math.cos(moonAngle) * orbitRadius;
+  const moonY = centerY + Math.sin(moonAngle) * orbitRadius;
+  const sunX = centerX + Math.cos(sunAngle) * sunDistance;
+  const sunY = centerY + Math.sin(sunAngle) * sunDistance;
+
+  const distMoon = Math.hypot(mouseX - moonX, mouseY - moonY);
+  const distSun = Math.hypot(mouseX - sunX, mouseY - sunY);
+
+  if (distMoon < moonRadius + 10) {
+    isDraggingMoon = true;
+  } else if (distSun < sunRadius + 15) {
+    isDraggingSun = true;
+  }
+});
+
+canvas.addEventListener("mousemove", (e) => {
+  if (isDraggingMoon) {
+    moonAngle = getMouseAngle(e.clientX, e.clientY);
+  } else if (isDraggingSun) {
+    sunAngle = getMouseAngle(e.clientX, e.clientY);
+  }
+});
+
+canvas.addEventListener("mouseup", () => {
+  isDraggingMoon = false;
+  isDraggingSun = false;
+});
+
+function animate() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (autoRotate && !isDraggingMoon) moonAngle += 0.01;
+  if (autoRotate && !isDraggingSun) sunAngle += 0.002;
+  if (lunarCycle && !isDraggingMoon) {
+    moonAngle += lunarSpeed;
+    lunarDay = Math.round((moonAngle % (2 * Math.PI)) / (2 * Math.PI) * 28);
+    if (lunarDay < 0) lunarDay += 28;
+  }
+
+  drawTide();
+  drawEarth();
+  drawMoon();
+  drawSun();
+
+  dayCounter.textContent = `Jour lunaire : ${lunarDay}`;
+  requestAnimationFrame(animate);
+}
+
+animate();
+</script>
+</body>
+</html>
