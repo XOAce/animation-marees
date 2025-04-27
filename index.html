@@ -73,6 +73,7 @@ canvas {
 <div class="button-group">
   <button id="toggleButton">Activer la rotation auto</button>
   <button id="lunarCycleButton">Démarrer cycle lunaire (28 jours)</button>
+  <button id="toggleSunButton">Cacher le Soleil</button>
   <label>Vitesse du cycle : <input id="speedSlider" type="range" min="0.001" max="0.02" step="0.0005" value="0.0025"></label>
 </div>
 <div id="tideIndicator">Amplitude marée : 0%</div>
@@ -115,12 +116,20 @@ let autoRotate = false;
 let lunarCycle = false;
 let lunarSpeed = 0.0025;
 let lunarDay = 0;
+let sunVisible = true;
 
 const toggleButton = document.getElementById("toggleButton");
 const lunarCycleButton = document.getElementById("lunarCycleButton");
 const tideIndicator = document.getElementById("tideIndicator");
 const speedSlider = document.getElementById("speedSlider");
 const dayCounter = document.getElementById("dayCounter");
+const toggleSunButton = document.getElementById("toggleSunButton");
+
+toggleSunButton.addEventListener("click", () => {
+  sunVisible = !sunVisible;
+  toggleSunButton.textContent = sunVisible ? "Cacher le Soleil" : "Afficher le Soleil";
+});
+
 
 speedSlider.addEventListener("input", () => {
   lunarSpeed = parseFloat(speedSlider.value);
@@ -237,6 +246,8 @@ function drawMoon() {
 }
 
 function drawSun() {
+  if (!sunVisible) return; // Si le soleil est désactivé, ne rien dessiner
+
   const sunX = centerX + Math.cos(sunAngle) * sunDistance;
   const sunY = centerY + Math.sin(sunAngle) * sunDistance;
   ctx.fillStyle = "#fcbf49";
@@ -247,7 +258,6 @@ function drawSun() {
   ctx.font = "18px sans-serif";
   ctx.fillText("Soleil", sunX + 40, sunY);
 
-  // Ligne entre Terre et Soleil
   ctx.beginPath();
   ctx.moveTo(centerX, centerY);
   ctx.lineTo(sunX, sunY);
