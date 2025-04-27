@@ -4,20 +4,16 @@
   <meta charset="UTF-8">
   <title>Animation Marées</title>
   <style>
-html, body {
-  margin: 0;
-  padding: 0;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  background: #001d3d;
-  font-family: sans-serif;
-}
-canvas {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #001d3d;
+      font-family: sans-serif;
+    }
+    canvas {
+      display: block;
+    }
     .button-group {
       position: absolute;
       top: 20px;
@@ -34,13 +30,23 @@ canvas {
       border-radius: 8px;
       cursor: pointer;
       box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-     }
+    }
     #tideIndicator {
       position: absolute;
       top: 20px;
       right: 20px;
       padding: 10px 15px;
       background: rgba(255, 255, 255, 0.8);
+      border-radius: 8px;
+      font-size: 16px;
+      color: #000;
+    }
+    #dayCounter {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      background: rgba(255,255,255,0.9);
+      padding: 10px 15px;
       border-radius: 8px;
       font-size: 16px;
       color: #000;
@@ -56,26 +62,19 @@ canvas {
       font-size: 14px;
       color: #000;
     }
-    #dayCounter {
-      position: absolute;
-      bottom: 20px;
-      right: 20px;
-      background: rgba(255,255,255,0.9);
-      padding: 10px 15px;
-      border-radius: 8px;
-      font-size: 16px;
-      color: #000;
-    }
   </style>
 </head>
 <body>
+
 <canvas id="canvas"></canvas>
+
 <div class="button-group">
   <button id="toggleButton">Activer la rotation auto</button>
   <button id="lunarCycleButton">Démarrer cycle lunaire (28 jours)</button>
-  <button id="toggleSunButton">Cacher le Soleil</button>
   <label>Vitesse du cycle : <input id="speedSlider" type="range" min="0.001" max="0.02" step="0.0005" value="0.0025"></label>
+  <button id="toggleSunButton">Cacher le Soleil</button>
 </div>
+
 <div id="tideIndicator">Amplitude marée : 0%</div>
 <div id="dayCounter">Jour lunaire : 0</div>
 <div id="legend">
@@ -89,16 +88,12 @@ canvas {
   - Le cycle lunaire dure environ 28 jours (animation accélérée ici).<br>
   - Utilisez le curseur pour ajuster la vitesse du cycle.
 </div>
+
 <script>
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
-function resizeCanvas() {
-  canvas.width = canvas.clientWidth;
-  canvas.height = canvas.clientHeight;
-}
-resizeCanvas();
-window.addEventListener('resize', resizeCanvas);
-
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
 
 const centerX = canvas.width / 2;
 const centerY = canvas.height / 2;
@@ -106,7 +101,7 @@ const earthRadius = 60;
 const moonRadius = 20;
 const sunRadius = 30;
 const orbitRadius = 200;
-let sunDistance = 350; // Réduit pour rester visible
+let sunDistance = 350;
 
 let moonAngle = 0;
 let sunAngle = Math.PI / 3;
@@ -116,7 +111,7 @@ let autoRotate = false;
 let lunarCycle = false;
 let lunarSpeed = 0.0025;
 let lunarDay = 0;
-let sunVisible = true;
+let sunVisible = true; // <--- NOUVELLE variable ici
 
 const toggleButton = document.getElementById("toggleButton");
 const lunarCycleButton = document.getElementById("lunarCycleButton");
@@ -124,12 +119,6 @@ const tideIndicator = document.getElementById("tideIndicator");
 const speedSlider = document.getElementById("speedSlider");
 const dayCounter = document.getElementById("dayCounter");
 const toggleSunButton = document.getElementById("toggleSunButton");
-
-toggleSunButton.addEventListener("click", () => {
-  sunVisible = !sunVisible;
-  toggleSunButton.textContent = sunVisible ? "Cacher le Soleil" : "Afficher le Soleil";
-});
-
 
 speedSlider.addEventListener("input", () => {
   lunarSpeed = parseFloat(speedSlider.value);
@@ -145,6 +134,11 @@ lunarCycleButton.addEventListener("click", () => {
   lunarCycleButton.textContent = lunarCycle ? "Arrêter cycle lunaire" : "Démarrer cycle lunaire (28 jours)";
 });
 
+toggleSunButton.addEventListener("click", () => {
+  sunVisible = !sunVisible;
+  toggleSunButton.textContent = sunVisible ? "Cacher le Soleil" : "Afficher le Soleil";
+});
+
 function drawEarth() {
   ctx.fillStyle = "#4ea8de";
   ctx.beginPath();
@@ -155,11 +149,16 @@ function drawEarth() {
 function drawTide() {
   const moonDx = Math.cos(moonAngle);
   const moonDy = Math.sin(moonAngle);
-  const sunDx = Math.cos(sunAngle);
-  const sunDy = Math.sin(sunAngle);
+  
+  let sunDx = 0;
+  let sunDy = 0;
+  if (sunVisible) {
+    sunDx = Math.cos(sunAngle) * 0.46;
+    sunDy = Math.sin(sunAngle) * 0.46;
+  }
 
-  const totalDx = moonDx * 1.0 + sunDx * 0.46;
-  const totalDy = moonDy * 1.0 + sunDy * 0.46;
+  const totalDx = moonDx * 1.0 + sunDx;
+  const totalDy = moonDy * 1.0 + sunDy;
   const angle = Math.atan2(totalDy, totalDx);
 
   const amplitude = Math.sqrt(totalDx * totalDx + totalDy * totalDy);
@@ -168,9 +167,9 @@ function drawTide() {
 
   let tideType = "normale";
   const angleDiff = Math.abs(moonAngle - sunAngle) % (2 * Math.PI);
-  if (angleDiff < 0.2 || Math.abs(angleDiff - Math.PI * 2) < 0.2 || Math.abs(angleDiff - Math.PI) < 0.2) {
+  if (sunVisible && (angleDiff < 0.2 || Math.abs(angleDiff - Math.PI * 2) < 0.2 || Math.abs(angleDiff - Math.PI) < 0.2)) {
     tideType = "Vives-eaux (fortes)";
-  } else if (Math.abs(angleDiff - Math.PI / 2) < 0.2 || Math.abs(angleDiff - 3 * Math.PI / 2) < 0.2) {
+  } else if (sunVisible && (Math.abs(angleDiff - Math.PI / 2) < 0.2 || Math.abs(angleDiff - 3 * Math.PI / 2) < 0.2)) {
     tideType = "Mortes-eaux (faibles)";
   }
 
@@ -186,7 +185,10 @@ function drawTide() {
   ctx.restore();
 
   drawForceArrow(centerX, centerY, moonDx, moonDy, "#f5f3ce");
-  drawForceArrow(centerX, centerY, sunDx * 0.46, sunDy * 0.46, "#fcbf49");
+
+  if (sunVisible) {
+    drawForceArrow(centerX, centerY, Math.cos(sunAngle) * 0.46, Math.sin(sunAngle) * 0.46, "#fcbf49");
+  }
 }
 
 function drawForceArrow(x, y, dx, dy, color) {
@@ -213,7 +215,6 @@ function drawMoon() {
   const moonX = centerX + Math.cos(moonAngle) * orbitRadius;
   const moonY = centerY + Math.sin(moonAngle) * orbitRadius;
 
-  // Phase lunaire (simplifiée)
   const phase = Math.cos(moonAngle - sunAngle);
   const illuminated = (phase + 1) / 2;
 
@@ -234,7 +235,6 @@ function drawMoon() {
   ctx.font = "14px sans-serif";
   ctx.fillText("Lune", moonX + 25, moonY);
 
-  // Ligne entre Terre et Lune
   ctx.beginPath();
   ctx.moveTo(centerX, centerY);
   ctx.lineTo(moonX, moonY);
@@ -246,8 +246,7 @@ function drawMoon() {
 }
 
 function drawSun() {
-  if (!sunVisible) return; // Si le soleil est désactivé, ne rien dessiner
-
+  if (!sunVisible) return;
   const sunX = centerX + Math.cos(sunAngle) * sunDistance;
   const sunY = centerY + Math.sin(sunAngle) * sunDistance;
   ctx.fillStyle = "#fcbf49";
@@ -284,7 +283,7 @@ canvas.addEventListener("mousedown", (e) => {
 
   if (distMoon < moonRadius + 10) {
     isDraggingMoon = true;
-  } else if (distSun < sunRadius + 15) {
+  } else if (distSun < sunRadius + 15 && sunVisible) {
     isDraggingSun = true;
   }
 });
@@ -324,5 +323,6 @@ function animate() {
 
 animate();
 </script>
+
 </body>
 </html>
